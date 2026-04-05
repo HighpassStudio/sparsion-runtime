@@ -104,6 +104,21 @@ impl Runtime {
             .count()
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
+
+    /// Inspect memory state: counts per tier.
+    fn inspect(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let result = self.inner
+            .inspect()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+        let dict = PyDict::new_bound(py);
+        dict.set_item("total_events", result.total_events)?;
+        dict.set_item("hot", result.hot)?;
+        dict.set_item("warm", result.warm)?;
+        dict.set_item("cold", result.cold)?;
+        dict.set_item("forgotten", result.forgotten)?;
+        Ok(dict.into())
+    }
 }
 
 fn parse_kind(s: &str) -> PyResult<EventKind> {

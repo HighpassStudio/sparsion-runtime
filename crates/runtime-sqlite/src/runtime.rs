@@ -269,6 +269,35 @@ impl SqliteRuntime {
         Ok(count)
     }
 
+    /// Inspect memory state: counts per tier, total events, top memories per tier.
+    pub fn inspect(&self) -> Result<InspectResult, RuntimeError> {
+        let conn = self.conn.lock().unwrap();
+
+        let total: u64 = conn
+            .query_row("SELECT COUNT(*) FROM events", [], |row| row.get(0))
+            .map_err(|e| RuntimeError::Storage(e.to_string()))?;
+
+        let mut tier_counts = std::collections::HashMap::new();
+        for tier in &["hot", "warm", "cold", "forgotten"] {
+            let count: u64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM memory_state WHERE tier = ?1",
+                    rusqlite::params![tier],
+                    |row| row.get(0),
+                )
+                .map_err(|e| RuntimeError::Storage(e.to_string()))?;
+            tier_counts.insert(tier.to_string(), count);
+        }
+
+        Ok(InspectResult {
+            total_events: total,
+            hot: *tier_counts.get("hot").unwrap_or(&0),
+            warm: *tier_counts.get("warm").unwrap_or(&0),
+            cold: *tier_counts.get("cold").unwrap_or(&0),
+            forgotten: *tier_counts.get("forgotten").unwrap_or(&0),
+        })
+    }
+
     /// Get memory state for a specific event by ID.
     pub fn get_memory(&self, id: Uuid) -> Result<ScoredMemory, RuntimeError> {
         let conn = self.conn.lock().unwrap();
@@ -303,6 +332,16 @@ impl SqliteRuntime {
 
         r.into_scored_memory()
     }
+}
+
+/// Result of inspecting memory state.
+#[derive(Debug, Clone)]
+pub struct InspectResult {
+    pub total_events: u64,
+    pub hot: u64,
+    pub warm: u64,
+    pub cold: u64,
+    pub forgotten: u64,
 }
 
 /// Internal helper for row parsing.
