@@ -194,3 +194,71 @@ fn sweep_reports_accurate_counts() {
     assert_eq!(s1.total_processed, 3);
     assert!(s1.forgotten >= 2, "at least 2 trivial observations should be forgotten: {}", s1.forgotten);
 }
+
+/// Override: recording a correction with overrides= demotes the target memory.
+#[test]
+fn override_demotes_target() {
+    let t0 = Utc::now();
+    let clock = Arc::new(MockClock::new(t0));
+    let rt = SqliteRuntime::in_memory_with_clock(clock.clone()).unwrap();
+
+    // Record original decision
+    let original = Event::new("user", EventKind::Decision, "Frontend: React")
+        .with_importance(Importance::High);
+    rt.record(&original).unwrap();
+
+    let orig_mem = rt.get_memory(original.id).unwrap();
+    assert_eq!(orig_mem.tier, MemoryTier::Hot, "original should start Hot");
+    let orig_salience = orig_mem.salience;
+
+    // Record correction that overrides it
+    let correction = Event::new("user", EventKind::Correction, "Switching to Svelte")
+        .with_importance(Importance::Critical)
+        .with_overrides(original.id);
+    rt.record(&correction).unwrap();
+
+    // Original should be demoted to Cold with reduced salience
+    let orig_after = rt.get_memory(original.id).unwrap();
+    assert_eq!(orig_after.tier, MemoryTier::Cold, "overridden memory should be Cold");
+    assert!(
+        orig_after.salience < orig_salience * 0.5,
+        "overridden salience should be significantly reduced: {} -> {}",
+        orig_salience, orig_after.salience
+    );
+    assert!(orig_after.is_overridden, "should be marked as overridden");
+
+    // Correction should be Hot
+    let corr_mem = rt.get_memory(correction.id).unwrap();
+    assert_eq!(corr_mem.tier, MemoryTier::Hot);
+    assert!(!corr_mem.is_overridden);
+
+    // Query should rank correction above original
+    let results = rt.query(&MemoryQuery::new().limit(10)).unwrap();
+    assert_eq!(results[0].event.content, "Switching to Svelte");
+    assert!(results[0].salience > results[1].salience);
+}
+
+/// Override: overridden memories are flagged in query results.
+#[test]
+fn override_flagged_in_queries() {
+    let t0 = Utc::now();
+    let clock = Arc::new(MockClock::new(t0));
+    let rt = SqliteRuntime::in_memory_with_clock(clock.clone()).unwrap();
+
+    let old = Event::new("user", EventKind::Decision, "Use ECS")
+        .with_importance(Importance::High);
+    rt.record(&old).unwrap();
+
+    let new = Event::new("user", EventKind::Correction, "Switch to App Runner")
+        .with_importance(Importance::Critical)
+        .with_overrides(old.id);
+    rt.record(&new).unwrap();
+
+    let results = rt.query(&MemoryQuery::new().text("ECS").limit(5)).unwrap();
+    assert_eq!(results.len(), 1);
+    assert!(results[0].is_overridden, "ECS memory should be flagged as overridden");
+
+    let results = rt.query(&MemoryQuery::new().text("App Runner").limit(5)).unwrap();
+    assert_eq!(results.len(), 1);
+    assert!(!results[0].is_overridden, "App Runner should NOT be flagged");
+}

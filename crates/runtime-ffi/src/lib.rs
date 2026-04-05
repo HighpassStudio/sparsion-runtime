@@ -22,12 +22,17 @@ impl Runtime {
     }
 
     /// Record an event into the runtime. Returns the event ID.
-    #[pyo3(signature = (source, kind, content, importance="normal"))]
-    fn record(&self, source: &str, kind: &str, content: &str, importance: &str) -> PyResult<String> {
+    #[pyo3(signature = (source, kind, content, importance="normal", overrides=None))]
+    fn record(&self, source: &str, kind: &str, content: &str, importance: &str, overrides: Option<String>) -> PyResult<String> {
         let event_kind = parse_kind(kind)?;
         let imp = parse_importance(importance)?;
 
-        let event = Event::new(source, event_kind, content).with_importance(imp);
+        let mut event = Event::new(source, event_kind, content).with_importance(imp);
+        if let Some(ref target) = overrides {
+            let target_id: uuid::Uuid = target.parse()
+                .map_err(|e: uuid::Error| PyRuntimeError::new_err(format!("invalid overrides UUID: {}", e)))?;
+            event = event.with_overrides(target_id);
+        }
         let id = event.id.to_string();
 
         self.inner
@@ -77,6 +82,7 @@ impl Runtime {
                 dict.set_item("tier", format!("{:?}", m.tier)).unwrap();
                 dict.set_item("occurrence_count", m.occurrence_count).unwrap();
                 dict.set_item("timestamp", m.event.timestamp.to_rfc3339()).unwrap();
+                dict.set_item("is_overridden", m.is_overridden).unwrap();
                 dict.into()
             })
             .collect();

@@ -536,6 +536,7 @@ dependencies = [
  "pyo3",
  "sparsion-sqlite",
  "sparsion-types",
+ "uuid",
 ]
 
 [[package]]
