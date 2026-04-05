@@ -74,6 +74,10 @@ python test_e2e.py                       # 4 e2e tests
 cargo run -p benchmark
 ```
 
+## Write-up
+
+[AI memory is broken. We built one that forgets.](https://dev.to/highpass_studio_382ce5641/ai-memory-is-broken-we-built-one-that-forgets-dmc)
+
 ## License
 
 MIT
