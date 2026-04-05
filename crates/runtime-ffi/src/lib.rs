@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::types::PyDict;
 
+use sparsion_core::RuntimePolicy;
 use sparsion_sqlite::SqliteRuntime;
 use sparsion_types::{Event, EventKind, Importance, MemoryQuery, MemoryTier};
 
@@ -14,9 +15,19 @@ struct Runtime {
 #[pymethods]
 impl Runtime {
     #[new]
-    #[pyo3(signature = (path))]
-    fn new(path: &str) -> PyResult<Self> {
-        let inner = SqliteRuntime::open(path)
+    #[pyo3(signature = (path, policy=None))]
+    fn new(path: &str, policy: Option<&str>) -> PyResult<Self> {
+        let rt_policy = match policy {
+            Some(name) => RuntimePolicy::from_name(name).ok_or_else(|| {
+                PyRuntimeError::new_err(format!(
+                    "unknown policy: '{}'. Expected: balanced, coding, knowledge, assistant",
+                    name
+                ))
+            })?,
+            None => RuntimePolicy::default(),
+        };
+
+        let inner = SqliteRuntime::open_with_policy(path, rt_policy)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Ok(Self { inner })
     }

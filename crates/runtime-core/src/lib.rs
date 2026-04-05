@@ -3,9 +3,11 @@ pub mod salience;
 pub mod decay;
 pub mod clock;
 pub mod error;
+pub mod policy;
 
 pub use traits::*;
 pub use salience::HeuristicScorer;
 pub use decay::TimeDecayPolicy;
 pub use clock::{Clock, SystemClock, MockClock};
 pub use error::RuntimeError;
+pub use policy::RuntimePolicy;

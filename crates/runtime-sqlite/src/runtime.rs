@@ -2,8 +2,8 @@ use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 use sparsion_core::{
-    Clock, DecayPolicy, HeuristicScorer, RuntimeError, SalienceScorer, SweepResult,
-    TimeDecayPolicy,
+    Clock, DecayPolicy, HeuristicScorer, RuntimeError, RuntimePolicy, SalienceScorer,
+    SweepResult, SystemClock, TimeDecayPolicy,
 };
 use sparsion_types::{Event, MemoryQuery, MemoryTier, ScoredMemory};
 use uuid::Uuid;
@@ -20,44 +20,48 @@ pub struct SqliteRuntime {
 
 impl SqliteRuntime {
     pub fn open(path: &str) -> Result<Self, RuntimeError> {
-        let conn = Connection::open(path).map_err(|e| RuntimeError::Storage(e.to_string()))?;
-        crate::init_db(&conn)?;
-        Ok(Self {
-            conn: Mutex::new(conn),
-            scorer: HeuristicScorer::default(),
-            decay: TimeDecayPolicy::default(),
-        })
+        let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+        let policy = RuntimePolicy::default();
+        Self::open_with(path, policy, clock)
+    }
+
+    pub fn open_with_policy(path: &str, policy: RuntimePolicy) -> Result<Self, RuntimeError> {
+        let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+        Self::open_with(path, policy, clock)
     }
 
     pub fn in_memory() -> Result<Self, RuntimeError> {
-        let conn =
-            Connection::open_in_memory().map_err(|e| RuntimeError::Storage(e.to_string()))?;
-        crate::init_db(&conn)?;
-        Ok(Self {
-            conn: Mutex::new(conn),
-            scorer: HeuristicScorer::default(),
-            decay: TimeDecayPolicy::default(),
-        })
+        let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+        let policy = RuntimePolicy::default();
+        Self::in_memory_with(policy, clock)
     }
 
     pub fn with_clock(path: &str, clock: Arc<dyn Clock>) -> Result<Self, RuntimeError> {
+        Self::open_with(path, RuntimePolicy::default(), clock)
+    }
+
+    pub fn in_memory_with_clock(clock: Arc<dyn Clock>) -> Result<Self, RuntimeError> {
+        Self::in_memory_with(RuntimePolicy::default(), clock)
+    }
+
+    pub fn open_with(path: &str, policy: RuntimePolicy, clock: Arc<dyn Clock>) -> Result<Self, RuntimeError> {
         let conn = Connection::open(path).map_err(|e| RuntimeError::Storage(e.to_string()))?;
         crate::init_db(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
-            scorer: HeuristicScorer::with_clock(168.0, clock.clone()),
-            decay: TimeDecayPolicy::with_clock(clock),
+            scorer: HeuristicScorer::from_policy(policy.clone(), clock.clone()),
+            decay: TimeDecayPolicy::from_policy(policy, clock),
         })
     }
 
-    pub fn in_memory_with_clock(clock: Arc<dyn Clock>) -> Result<Self, RuntimeError> {
+    pub fn in_memory_with(policy: RuntimePolicy, clock: Arc<dyn Clock>) -> Result<Self, RuntimeError> {
         let conn =
             Connection::open_in_memory().map_err(|e| RuntimeError::Storage(e.to_string()))?;
         crate::init_db(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
-            scorer: HeuristicScorer::with_clock(168.0, clock.clone()),
-            decay: TimeDecayPolicy::with_clock(clock),
+            scorer: HeuristicScorer::from_policy(policy.clone(), clock.clone()),
+            decay: TimeDecayPolicy::from_policy(policy, clock),
         })
     }
 
