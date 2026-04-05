@@ -36,6 +36,14 @@ pub fn init_db(conn: &Connection) -> Result<(), RuntimeError> {
         CREATE INDEX IF NOT EXISTS idx_events_kind ON events(kind);
         CREATE INDEX IF NOT EXISTS idx_memory_salience ON memory_state(salience);
         CREATE INDEX IF NOT EXISTS idx_memory_tier ON memory_state(tier);
+
+        CREATE TABLE IF NOT EXISTS overrides (
+            source_id TEXT NOT NULL REFERENCES events(id),
+            target_id TEXT NOT NULL REFERENCES events(id),
+            PRIMARY KEY (source_id, target_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_overrides_target ON overrides(target_id);
         ",
     )
     .map_err(|e| RuntimeError::Storage(e.to_string()))?;

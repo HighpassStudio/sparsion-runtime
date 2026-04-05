@@ -12,6 +12,8 @@ pub struct Event {
     pub content: String,
     pub metadata: serde_json::Value,
     pub importance: Importance,
+    /// If set, this event explicitly overrides/supersedes another event.
+    pub overrides: Option<Uuid>,
 }
 
 impl Event {
@@ -24,6 +26,7 @@ impl Event {
             content: content.into(),
             metadata: serde_json::Value::Null,
             importance: Importance::Normal,
+            overrides: None,
         }
     }
 
@@ -34,6 +37,11 @@ impl Event {
 
     pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
         self.metadata = metadata;
+        self
+    }
+
+    pub fn with_overrides(mut self, target_id: Uuid) -> Self {
+        self.overrides = Some(target_id);
         self
     }
 }
@@ -97,6 +105,8 @@ pub struct ScoredMemory {
     pub tier: MemoryTier,
     pub occurrence_count: u32,
     pub last_accessed: DateTime<Utc>,
+    /// True if this memory has been overridden by a newer event.
+    pub is_overridden: bool,
 }
 
 /// Query for retrieving memories.

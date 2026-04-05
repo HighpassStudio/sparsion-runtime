@@ -93,6 +93,7 @@ impl MemoryRetriever for SqliteRetriever {
                     .map_err(|e| RuntimeError::Query(e.to_string()))?,
                 importance: serde_json::from_str(&format!("\"{}\"", imp_str))
                     .map_err(|e| RuntimeError::Query(e.to_string()))?,
+                overrides: None,
             };
 
             let tier: MemoryTier = serde_json::from_str(&format!("\"{}\"", tier_str))
@@ -108,6 +109,7 @@ impl MemoryRetriever for SqliteRetriever {
                 tier,
                 occurrence_count: occ,
                 last_accessed,
+                is_overridden: false,
             });
         }
 
@@ -161,6 +163,7 @@ impl MemoryRetriever for SqliteRetriever {
                     .unwrap_or(MemoryTier::Cold),
                 occurrence_count: occ,
                 last_accessed,
+                is_overridden: false,
             };
 
             let new_salience = self.decay_policy.decay(&memory);

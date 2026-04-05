@@ -110,6 +110,23 @@ impl SqliteRuntime {
         )
         .map_err(|e| RuntimeError::Storage(e.to_string()))?;
 
+        // Handle override relationship
+        if let Some(target_id) = &event.overrides {
+            conn.execute(
+                "INSERT OR IGNORE INTO overrides (source_id, target_id) VALUES (?1, ?2)",
+                rusqlite::params![event.id.to_string(), target_id.to_string()],
+            )
+            .map_err(|e| RuntimeError::Storage(e.to_string()))?;
+
+            // Demote the overridden memory — halve its salience and drop tier
+            conn.execute(
+                "UPDATE memory_state SET salience = salience * 0.25, tier = 'cold'
+                 WHERE event_id = ?1 AND tier != 'forgotten'",
+                rusqlite::params![target_id.to_string()],
+            )
+            .map_err(|e| RuntimeError::Storage(e.to_string()))?;
+        }
+
         Ok(salience)
     }
 
@@ -120,7 +137,8 @@ impl SqliteRuntime {
 
         let mut sql = String::from(
             "SELECT e.id, e.timestamp, e.source, e.kind, e.content, e.metadata, e.importance,
-                    m.salience, m.tier, m.occurrence_count, m.last_accessed
+                    m.salience, m.tier, m.occurrence_count, m.last_accessed,
+                    CASE WHEN EXISTS(SELECT 1 FROM overrides o WHERE o.target_id = e.id) THEN 1 ELSE 0 END AS is_overridden
              FROM events e
              JOIN memory_state m ON e.id = m.event_id
              WHERE m.tier != 'forgotten'",
@@ -167,6 +185,7 @@ impl SqliteRuntime {
                     tier_str: row.get(8)?,
                     occurrence_count: row.get(9)?,
                     last_accessed_str: row.get(10)?,
+                    is_overridden: row.get::<_, i32>(11).unwrap_or(0) != 0,
                 })
             })
             .map_err(|e| RuntimeError::Query(e.to_string()))?;
@@ -188,7 +207,8 @@ impl SqliteRuntime {
         let mut stmt = conn
             .prepare(
                 "SELECT e.id, e.timestamp, e.source, e.kind, e.content, e.metadata, e.importance,
-                        m.salience, m.tier, m.occurrence_count, m.last_accessed
+                        m.salience, m.tier, m.occurrence_count, m.last_accessed,
+                        CASE WHEN EXISTS(SELECT 1 FROM overrides o WHERE o.target_id = e.id) THEN 1 ELSE 0 END
                  FROM events e
                  JOIN memory_state m ON e.id = m.event_id
                  WHERE m.tier != 'forgotten'",
@@ -209,6 +229,7 @@ impl SqliteRuntime {
                     tier_str: row.get(8)?,
                     occurrence_count: row.get(9)?,
                     last_accessed_str: row.get(10)?,
+                    is_overridden: row.get::<_, i32>(11).unwrap_or(0) != 0,
                 })
             })
             .map_err(|e| RuntimeError::Storage(e.to_string()))?
@@ -304,7 +325,8 @@ impl SqliteRuntime {
         let r = conn
             .query_row(
                 "SELECT e.id, e.timestamp, e.source, e.kind, e.content, e.metadata, e.importance,
-                        m.salience, m.tier, m.occurrence_count, m.last_accessed
+                        m.salience, m.tier, m.occurrence_count, m.last_accessed,
+                        CASE WHEN EXISTS(SELECT 1 FROM overrides o WHERE o.target_id = e.id) THEN 1 ELSE 0 END
                  FROM events e
                  JOIN memory_state m ON e.id = m.event_id
                  WHERE e.id = ?1",
@@ -322,6 +344,7 @@ impl SqliteRuntime {
                         tier_str: row.get(8)?,
                         occurrence_count: row.get(9)?,
                         last_accessed_str: row.get(10)?,
+                        is_overridden: row.get::<_, i32>(11).unwrap_or(0) != 0,
                     })
                 },
             )
@@ -357,6 +380,7 @@ struct RawRow {
     tier_str: String,
     occurrence_count: u32,
     last_accessed_str: String,
+    is_overridden: bool,
 }
 
 impl RawRow {
@@ -378,6 +402,7 @@ impl RawRow {
                 .map_err(|e| RuntimeError::Storage(e.to_string()))?,
             importance: serde_json::from_str(&format!("\"{}\"", self.imp_str))
                 .map_err(|e| RuntimeError::Storage(e.to_string()))?,
+            overrides: None, // not loaded from DB — the relationship is in the overrides table
         };
 
         let tier: MemoryTier = serde_json::from_str(&format!("\"{}\"", self.tier_str))
@@ -394,6 +419,7 @@ impl RawRow {
             tier,
             occurrence_count: self.occurrence_count,
             last_accessed,
+            is_overridden: self.is_overridden,
         })
     }
 }

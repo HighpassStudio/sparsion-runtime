@@ -138,6 +138,7 @@ impl EventStore for SqliteEventStore {
                 .map_err(|e| RuntimeError::Storage(e.to_string()))?,
             importance: serde_json::from_str(&format!("\"{}\"", imp_str))
                 .map_err(|e| RuntimeError::Storage(e.to_string()))?,
+            overrides: None,
         })
     }
 

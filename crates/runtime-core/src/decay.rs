@@ -80,6 +80,7 @@ mod tests {
             tier: MemoryTier::Hot,
             occurrence_count: 1,
             last_accessed: timestamp,
+            is_overridden: false,
         }
     }
 
