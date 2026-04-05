@@ -1,64 +1,48 @@
 # AI memory is broken. We built one that forgets.
 
-AI systems today either forget everything or remember everything.
+Every agent framework has the same problem with memory: it doesn't forget.
 
-Neither works.
+Context windows reset between sessions. RAG and vector DBs store everything with equal weight and grow until they're noisy. So when your project changes direction two weeks in, the AI still pulls up week-one decisions like they're current.
 
-Context windows forget between sessions. Vector databases and RAG pipelines store everything equally and grow forever. The result is familiar to anyone building agents: when a project changes direction, the AI keeps surfacing stale, contradicted information.
+## What this actually looks like
 
-## A real example
+**Week 1:** You tell the agent "we're using React for the frontend."
 
-**Week 1:** "Frontend framework: React"
+**Week 2:** You switch. "Moving to Svelte, React bundle is too big."
 
-**Week 2:** "Switching frontend from React to Svelte — smaller bundle"
+**Week 4:** You ask "what's our frontend stack?"
 
-**Week 4 query:** "What framework are we using?"
+A normal retrieval system hands back both answers. React and Svelte sit side by side with equal weight. Nothing in the system knows one replaced the other. So the agent might reference React, Svelte, or some confused mix of both.
 
-Naive retrieval returns both entries with equal weight. The original React decision still sits in memory alongside the Svelte correction. An agent consuming this context may reference React, Svelte, or both — because nothing in the memory system knows that one supersedes the other.
+We kept running into this while building agent tooling, and it became clear the issue isn't retrieval quality — it's that these systems have no concept of time or obsolescence.
 
-Here's what happens in practice:
+## The numbers
 
-## The benchmark
+We ran a 4-week simulated project through both systems. 24 events total — decisions, corrections, errors, repeated observations. Two major direction changes mid-project.
 
-We simulated a 4-week software project with 24 events — observations, decisions, errors, corrections, and repeated signals. Two major direction changes occurred mid-project (frontend framework switch, hosting platform switch). At week 4, we queried both systems.
+| | Naive | Sparsion |
+|--|-------|----------|
+| **Top result correct** | No | **Yes** |
+| Pruned stale memories | 0 | 2 |
+| Retrievable at week 4 | 24 | 22 |
 
-| Metric | Naive | Sparsion Runtime |
-|--------|-------|-----------------|
-| **Top result correct** | NO | **YES** |
-| Forgotten (pruned) | 0 | 2 |
-| Retrievable memories | 24 | 22 |
+Naive retrieval puts a stale entry on top. Sparsion puts the correction first — salience 1.65 vs 0.55 for the outdated original.
 
-Naive memory returns a stale observation as its top result. Sparsion surfaces the correction — with a salience score of 1.65 vs 0.55 for the outdated original decision.
+## What Sparsion actually does
 
-**When project direction changes, Sparsion adapts. Naive memory doesn't.**
-
-## The insight
-
-Human memory works because it forgets. Irrelevant details fade. Repeated patterns strengthen. Corrections override old beliefs. Outdated information disappears.
-
-Current AI memory systems don't do any of this.
-
-Sparsion Runtime is a temporal memory engine that remembers what matters and forgets the rest.
-
-## How it works
-
-Every event enters a lifecycle:
+It treats memory as a lifecycle instead of a log.
 
 ```
 Events → Salience Scoring → Hot → Warm → Cold → Forgotten
 ```
 
-Sparsion uses five mechanisms:
+- Old memories weaken over time (exponential decay, configurable half-life)
+- Repeated events get stronger (log-frequency)
+- You can flag things as critical — those survive 4x longer
+- Corrections score 3x higher than observations by default
+- Anything below a salience floor gets dropped from retrieval entirely
 
-- **Temporal decay** — older memories weaken over time (exponential, configurable half-life)
-- **Reinforcement** — repeated events strengthen memory traces (log-frequency weighting)
-- **Importance hints** — critical events survive longer (4x weight vs normal)
-- **Event type weighting** — corrections score 3x, decisions 2x, observations 0.7x
-- **Selective forgetting** — memories below threshold are pruned from retrieval
-
-The result: a memory system that evolves instead of accumulating.
-
-In our benchmark, a critical correction starts at salience 13.18. A normal observation starts at 0.77. After 6 weeks without reinforcement, the observation is forgotten. The correction survives. That's the memory policy working as designed.
+A critical correction enters the system at salience 13.18. A throwaway observation enters at 0.77. After six weeks with no reinforcement, the observation is gone. The correction is still there.
 
 ## Try it
 
@@ -73,60 +57,53 @@ rt.record("user", "decision", "Frontend framework: React", importance="high")
 # Week 2
 rt.record("user", "correction", "Switching to Svelte — React bundle too large", importance="critical")
 
-# Query at week 4
+# Query
 memories = rt.query(text="frontend", limit=3)
 for m in memories:
     print(f"[{m['tier']}] {m['content']} (salience: {m['salience']:.2f})")
 # [Hot] Switching to Svelte — React bundle too large (salience: 13.18)
 # [Hot] Frontend framework: React (salience: 4.39)
 
-# Run decay sweep
+# Age everything
 result = rt.sweep()
 print(f"Forgot {result['forgotten']} stale memories")
 ```
 
-## Architecture
+## Under the hood
 
-Rust core with Python SDK (PyO3/maturin). SQLite storage. Heuristic salience scoring — no model dependency for v0.1.
+Rust core, Python bindings via PyO3/maturin, SQLite for storage. No model dependency — salience scoring is heuristic for now.
 
 ```
-Rust Core (sparsion-core)
+Rust core
   ├── Event store (SQLite)
-  ├── Salience scorer (heuristic)
-  ├── Memory tier manager (hot/warm/cold)
+  ├── Salience scorer
+  ├── Tier manager (hot/warm/cold)
   ├── Decay engine
-  └── Retrieval (salience-ranked)
+  └── Ranked retrieval
        ↓
-  PyO3 bindings
-       ↓
-  Python SDK (pip install sparsion)
+  PyO3 → Python SDK (pip install sparsion)
 ```
 
-12 Rust unit tests. 5 storage-backed integration tests with deterministic time (MockClock). 4 Python end-to-end tests.
+Tests: 12 Rust unit, 5 integration (deterministic time via MockClock), 4 Python end-to-end.
 
-## What's next
-
-Sparsion Runtime v0.1 is available now:
+## What's in v0.1
 
 - Temporal decay with configurable half-life
 - Reinforcement through repetition
 - Importance hints (low/normal/high/critical)
-- Event type weighting (corrections > decisions > errors > actions > observations)
-- Tier migration (hot → warm → cold → forgotten)
-- Full forgetting loop through storage
-- Python SDK with record/query/sweep
+- Event type weighting — corrections > decisions > errors > actions > observations
+- Tier migration and forgetting loop through storage
+- Python SDK
 
-We're exploring:
+## What's coming
 
-- Real agent workflow integrations
-- Larger benchmarks with longer time horizons
-- Contradiction-aware belief updates (v0.2)
+- Plugging into real agent workflows
+- Bigger benchmarks, longer time horizons
+- Contradiction-aware updates
 - LangChain memory backend
 
-If you're building agents and hitting memory limits — stale context, growing token costs, agents that can't adapt — we'd like to hear from you.
+If you're building agents and keep hitting stale context problems, I'd like to hear about your use case.
 
 ---
 
-**Sparsion Runtime** — AI that remembers what matters and forgets the rest.
-
-GitHub: github.com/HighpassStudio/sparsion-runtime
+**Sparsion Runtime** — github.com/HighpassStudio/sparsion-runtime
