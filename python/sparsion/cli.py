@@ -9,20 +9,20 @@ from sparsion import Runtime
 DEFAULT_DB = os.path.expanduser("~/.sparsion/memory.db")
 
 
-def get_runtime(db_path=None):
+def get_runtime(db_path=None, policy=None):
     path = db_path or os.environ.get("SPARSION_DB", DEFAULT_DB)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    return Runtime(path)
+    return Runtime(path, policy=policy)
 
 
 def cmd_record(args):
-    rt = get_runtime(args.db)
+    rt = get_runtime(args.db, args.policy)
     event_id = rt.record(args.source, args.kind, args.content, importance=args.importance)
     print(event_id)
 
 
 def cmd_query(args):
-    rt = get_runtime(args.db)
+    rt = get_runtime(args.db, args.policy)
     memories = rt.query(
         text=args.text,
         source=args.source,
@@ -44,7 +44,7 @@ def cmd_query(args):
 
 
 def cmd_sweep(args):
-    rt = get_runtime(args.db)
+    rt = get_runtime(args.db, args.policy)
     result = rt.sweep()
     print(f"Swept {result['total_processed']} memories: "
           f"{result['demoted']} demoted, {result['forgotten']} forgotten, "
@@ -52,7 +52,7 @@ def cmd_sweep(args):
 
 
 def cmd_inspect(args):
-    rt = get_runtime(args.db)
+    rt = get_runtime(args.db, args.policy)
     count = rt.count()
     print(f"Total events: {count}")
     print()
@@ -68,7 +68,7 @@ def cmd_inspect(args):
 
 def cmd_context(args):
     """Output top memories as context for an agent prompt."""
-    rt = get_runtime(args.db)
+    rt = get_runtime(args.db, args.policy)
     memories = rt.query(
         text=args.text,
         source=args.source,
@@ -89,6 +89,8 @@ def cmd_context(args):
 def main():
     parser = argparse.ArgumentParser(prog="sparsion", description="Temporal memory for AI agents")
     parser.add_argument("--db", help=f"Database path (default: {DEFAULT_DB})")
+    parser.add_argument("--policy", choices=["balanced", "coding", "knowledge", "assistant"],
+                        help="Domain policy preset")
     sub = parser.add_subparsers(dest="command")
 
     # record

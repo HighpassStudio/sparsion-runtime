@@ -2,21 +2,21 @@ use std::sync::Arc;
 use sparsion_types::{Event, EventKind};
 
 use crate::clock::{Clock, SystemClock};
+use crate::policy::RuntimePolicy;
 use crate::traits::SalienceScorer;
 
 /// Heuristic salience scorer for v0.1.
 ///
 /// salience = recency_decay × log(occurrence_count + 1) × importance_weight × event_type_weight
 pub struct HeuristicScorer {
-    /// Half-life in hours — after this many hours, recency contribution halves.
-    pub half_life_hours: f64,
+    policy: RuntimePolicy,
     clock: Arc<dyn Clock>,
 }
 
 impl Default for HeuristicScorer {
     fn default() -> Self {
         Self {
-            half_life_hours: 168.0, // 1 week
+            policy: RuntimePolicy::default(),
             clock: Arc::new(SystemClock),
         }
     }
@@ -24,17 +24,22 @@ impl Default for HeuristicScorer {
 
 impl HeuristicScorer {
     pub fn new(half_life_hours: f64) -> Self {
+        let mut policy = RuntimePolicy::default();
+        policy.half_life_hours = half_life_hours;
         Self {
-            half_life_hours,
+            policy,
             clock: Arc::new(SystemClock),
         }
     }
 
     pub fn with_clock(half_life_hours: f64, clock: Arc<dyn Clock>) -> Self {
-        Self {
-            half_life_hours,
-            clock,
-        }
+        let mut policy = RuntimePolicy::default();
+        policy.half_life_hours = half_life_hours;
+        Self { policy, clock }
+    }
+
+    pub fn from_policy(policy: RuntimePolicy, clock: Arc<dyn Clock>) -> Self {
+        Self { policy, clock }
     }
 
     fn recency_weight(&self, event: &Event) -> f64 {
@@ -45,17 +50,16 @@ impl HeuristicScorer {
             .num_minutes() as f64
             / 60.0;
 
-        // Exponential decay: 0.5^(age / half_life)
-        (0.5_f64).powf(age_hours / self.half_life_hours)
+        (0.5_f64).powf(age_hours / self.policy.half_life_hours)
     }
 
-    fn event_type_weight(kind: EventKind) -> f64 {
+    fn event_type_weight(&self, kind: EventKind) -> f64 {
         match kind {
-            EventKind::Correction => 3.0,  // belief updates are high signal
-            EventKind::Decision => 2.0,    // decisions shape future behavior
-            EventKind::Error => 1.5,       // errors are notable
-            EventKind::UserAction => 1.0,  // baseline
-            EventKind::Observation => 0.7, // lowest default weight
+            EventKind::Correction => self.policy.correction_weight,
+            EventKind::Decision => self.policy.decision_weight,
+            EventKind::Error => self.policy.error_weight,
+            EventKind::UserAction => self.policy.action_weight,
+            EventKind::Observation => self.policy.observation_weight,
         }
     }
 }
@@ -65,7 +69,7 @@ impl SalienceScorer for HeuristicScorer {
         let recency = self.recency_weight(event);
         let frequency = (occurrence_count as f64 + 1.0).ln_1p();
         let importance = event.importance.weight();
-        let event_type = Self::event_type_weight(event.kind);
+        let event_type = self.event_type_weight(event.kind);
 
         recency * frequency * importance * event_type
     }
@@ -125,19 +129,42 @@ mod tests {
         let event = Event::new("test", EventKind::Decision, "chose Rust");
         let fresh_score = scorer.score(&event, 1);
 
-        // Advance 1 week (one half-life)
         clock.advance(Duration::hours(168));
         let week_old_score = scorer.score(&event, 1);
 
-        // After one half-life, score should be ~half
         assert!(week_old_score < fresh_score * 0.6);
         assert!(week_old_score > fresh_score * 0.4);
 
-        // Advance another week
         clock.advance(Duration::hours(168));
         let two_week_score = scorer.score(&event, 1);
 
-        // Should be ~quarter of original
         assert!(two_week_score < fresh_score * 0.3);
+    }
+
+    #[test]
+    fn coding_policy_decays_faster() {
+        use crate::clock::MockClock;
+        use chrono::Duration;
+
+        let clock = Arc::new(MockClock::now_fixed());
+        let balanced = HeuristicScorer::from_policy(RuntimePolicy::balanced(), clock.clone());
+        let coding = HeuristicScorer::from_policy(RuntimePolicy::coding(), clock.clone());
+
+        let event = Event::new("test", EventKind::Observation, "build output");
+        let balanced_score = balanced.score(&event, 1);
+        let coding_score = coding.score(&event, 1);
+
+        // Coding policy has lower observation weight (0.5 vs 0.7)
+        assert!(coding_score < balanced_score);
+
+        // After 3 days, coding half-life hits — balanced still has most of its value
+        clock.advance(Duration::hours(72));
+        let balanced_after = balanced.score(&event, 1);
+        let coding_after = coding.score(&event, 1);
+
+        // Coding should have decayed more (hit half-life)
+        let balanced_ratio = balanced_after / balanced_score;
+        let coding_ratio = coding_after / coding_score;
+        assert!(coding_ratio < balanced_ratio, "coding should decay faster");
     }
 }
