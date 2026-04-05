@@ -120,6 +120,10 @@ def main():
     p_ctx.add_argument("-s", "--source", help="Source filter")
     p_ctx.add_argument("-n", "--limit", type=int, default=10)
 
+    # dashboard
+    p_dash = sub.add_parser("dashboard", help="Visual memory dashboard")
+    p_dash.add_argument("-n", "--top", type=int, default=5, help="Top N memories per tier")
+
     args = parser.parse_args()
 
     if args.command == "record":
@@ -132,6 +136,9 @@ def main():
         cmd_inspect(args)
     elif args.command == "context":
         cmd_context(args)
+    elif args.command == "dashboard":
+        from sparsion.dashboard import render_dashboard
+        render_dashboard(db_path=args.db, top=args.top, policy=args.policy)
     else:
         parser.print_help()
 
