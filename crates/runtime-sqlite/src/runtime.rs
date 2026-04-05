@@ -282,22 +282,71 @@ impl SqliteRuntime {
             .map_err(|e| RuntimeError::Storage(e.to_string()))?;
         }
 
+        // Save snapshot after sweep
+        let snap = self.count_tiers_inner(&conn)?;
+        conn.execute(
+            "INSERT INTO snapshots (timestamp, hot, warm, cold, forgotten) VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![
+                chrono::Utc::now().to_rfc3339(),
+                snap.hot,
+                snap.warm,
+                snap.cold,
+                snap.forgotten,
+            ],
+        )
+        .map_err(|e| RuntimeError::Storage(e.to_string()))?;
+
         Ok(result)
     }
 
-    /// Get total event count.
-    pub fn count(&self) -> Result<u64, RuntimeError> {
+    /// Get historical snapshots for timeline charts.
+    pub fn get_snapshots(&self, limit: usize) -> Result<Vec<Snapshot>, RuntimeError> {
         let conn = self.conn.lock().unwrap();
-        let count: u64 = conn
-            .query_row("SELECT COUNT(*) FROM events", [], |row| row.get(0))
+        let mut stmt = conn
+            .prepare(
+                "SELECT timestamp, hot, warm, cold, forgotten FROM snapshots ORDER BY id DESC LIMIT ?1",
+            )
             .map_err(|e| RuntimeError::Storage(e.to_string()))?;
-        Ok(count)
+
+        let rows = stmt
+            .query_map(rusqlite::params![limit as u64], |row| {
+                Ok(Snapshot {
+                    timestamp: row.get(0)?,
+                    hot: row.get(1)?,
+                    warm: row.get(2)?,
+                    cold: row.get(3)?,
+                    forgotten: row.get(4)?,
+                })
+            })
+            .map_err(|e| RuntimeError::Storage(e.to_string()))?;
+
+        let mut results: Vec<Snapshot> = Vec::new();
+        for row in rows {
+            results.push(row.map_err(|e| RuntimeError::Storage(e.to_string()))?);
+        }
+        results.reverse(); // oldest first for timeline
+        Ok(results)
     }
 
-    /// Inspect memory state: counts per tier, total events, top memories per tier.
-    pub fn inspect(&self) -> Result<InspectResult, RuntimeError> {
+    /// Get salience distribution for histogram.
+    pub fn get_salience_distribution(&self) -> Result<Vec<f64>, RuntimeError> {
         let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare("SELECT salience FROM memory_state WHERE tier != 'forgotten' ORDER BY salience DESC")
+            .map_err(|e| RuntimeError::Storage(e.to_string()))?;
 
+        let rows = stmt
+            .query_map([], |row| row.get::<_, f64>(0))
+            .map_err(|e| RuntimeError::Storage(e.to_string()))?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row.map_err(|e| RuntimeError::Storage(e.to_string()))?);
+        }
+        Ok(results)
+    }
+
+    fn count_tiers_inner(&self, conn: &Connection) -> Result<InspectResult, RuntimeError> {
         let total: u64 = conn
             .query_row("SELECT COUNT(*) FROM events", [], |row| row.get(0))
             .map_err(|e| RuntimeError::Storage(e.to_string()))?;
@@ -321,6 +370,21 @@ impl SqliteRuntime {
             cold: *tier_counts.get("cold").unwrap_or(&0),
             forgotten: *tier_counts.get("forgotten").unwrap_or(&0),
         })
+    }
+
+    /// Get total event count.
+    pub fn count(&self) -> Result<u64, RuntimeError> {
+        let conn = self.conn.lock().unwrap();
+        let count: u64 = conn
+            .query_row("SELECT COUNT(*) FROM events", [], |row| row.get(0))
+            .map_err(|e| RuntimeError::Storage(e.to_string()))?;
+        Ok(count)
+    }
+
+    /// Inspect memory state: counts per tier, total events.
+    pub fn inspect(&self) -> Result<InspectResult, RuntimeError> {
+        let conn = self.conn.lock().unwrap();
+        self.count_tiers_inner(&conn)
     }
 
     /// Get memory state for a specific event by ID.
@@ -365,6 +429,16 @@ impl SqliteRuntime {
 #[derive(Debug, Clone)]
 pub struct InspectResult {
     pub total_events: u64,
+    pub hot: u64,
+    pub warm: u64,
+    pub cold: u64,
+    pub forgotten: u64,
+}
+
+/// A point-in-time snapshot of tier distribution.
+#[derive(Debug, Clone)]
+pub struct Snapshot {
+    pub timestamp: String,
     pub hot: u64,
     pub warm: u64,
     pub cold: u64,

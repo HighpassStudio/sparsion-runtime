@@ -136,6 +136,39 @@ impl Runtime {
         dict.set_item("forgotten", result.forgotten)?;
         Ok(dict.into())
     }
+
+    /// Get historical tier snapshots for timeline charts.
+    #[pyo3(signature = (limit=100))]
+    fn get_snapshots(&self, py: Python<'_>, limit: usize) -> PyResult<Vec<PyObject>> {
+        let snapshots = self.inner
+            .get_snapshots(limit)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+        let results: Vec<PyObject> = snapshots
+            .iter()
+            .map(|s| {
+                let dict = PyDict::new_bound(py);
+                dict.set_item("timestamp", &s.timestamp).unwrap();
+                dict.set_item("hot", s.hot).unwrap();
+                dict.set_item("warm", s.warm).unwrap();
+                dict.set_item("cold", s.cold).unwrap();
+                dict.set_item("forgotten", s.forgotten).unwrap();
+                dict.into()
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    /// Get salience values for all active memories (for histogram).
+    fn get_salience_distribution(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let values = self.inner
+            .get_salience_distribution()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+        let list = pyo3::types::PyList::new_bound(py, &values);
+        Ok(list.into())
+    }
 }
 
 fn parse_kind(s: &str) -> PyResult<EventKind> {

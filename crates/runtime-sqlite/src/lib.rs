@@ -44,6 +44,15 @@ pub fn init_db(conn: &Connection) -> Result<(), RuntimeError> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_overrides_target ON overrides(target_id);
+
+        CREATE TABLE IF NOT EXISTS snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            hot INTEGER NOT NULL,
+            warm INTEGER NOT NULL,
+            cold INTEGER NOT NULL,
+            forgotten INTEGER NOT NULL
+        );
         ",
     )
     .map_err(|e| RuntimeError::Storage(e.to_string()))?;

@@ -121,8 +121,12 @@ def main():
     p_ctx.add_argument("-n", "--limit", type=int, default=10)
 
     # dashboard
-    p_dash = sub.add_parser("dashboard", help="Visual memory dashboard")
+    p_dash = sub.add_parser("dashboard", help="Terminal memory dashboard")
     p_dash.add_argument("-n", "--top", type=int, default=5, help="Top N memories per tier")
+
+    # serve
+    p_serve = sub.add_parser("serve", help="Web dashboard (requires fastapi + uvicorn)")
+    p_serve.add_argument("-p", "--port", type=int, default=8765, help="Port (default: 8765)")
 
     args = parser.parse_args()
 
@@ -139,6 +143,9 @@ def main():
     elif args.command == "dashboard":
         from sparsion.dashboard import render_dashboard
         render_dashboard(db_path=args.db, top=args.top, policy=args.policy)
+    elif args.command == "serve":
+        from sparsion.server import start_server
+        start_server(db_path=args.db, policy=args.policy, port=args.port)
     else:
         parser.print_help()
 
