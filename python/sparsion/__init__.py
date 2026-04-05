@@ -22,4 +22,4 @@ Usage:
 from sparsion.sparsion_runtime import Runtime
 
 __all__ = ["Runtime"]
-__version__ = "0.3.3"
+__version__ = "0.3.4"
