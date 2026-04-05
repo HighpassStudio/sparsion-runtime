@@ -14,9 +14,9 @@ Context windows forget between sessions. Vector databases and RAG pipelines stor
 
 **Week 4 query:** "What framework are we using?"
 
-Naive retrieval returns the observation from week 2 first — not the correction. The original React decision still sits in memory with equal weight. An agent consuming this context may reference React, Svelte, or both — because nothing in the memory system knows that one supersedes the other.
+Naive retrieval returns both entries with equal weight. The original React decision still sits in memory alongside the Svelte correction. An agent consuming this context may reference React, Svelte, or both — because nothing in the memory system knows that one supersedes the other.
 
-This is the core problem: **AI memory doesn't adapt when reality changes.**
+Here's what happens in practice:
 
 ## The benchmark
 
@@ -48,7 +48,7 @@ Every event enters a lifecycle:
 Events → Salience Scoring → Hot → Warm → Cold → Forgotten
 ```
 
-Five core mechanics:
+Sparsion uses five mechanisms:
 
 - **Temporal decay** — older memories weaken over time (exponential, configurable half-life)
 - **Reinforcement** — repeated events strengthen memory traces (log-frequency weighting)
@@ -127,6 +127,6 @@ If you're building agents and hitting memory limits — stale context, growing t
 
 ---
 
-**Sparsion Runtime** — Temporal memory for AI systems.
+**Sparsion Runtime** — AI that remembers what matters and forgets the rest.
 
 GitHub: github.com/HighpassStudio/sparsion-runtime
