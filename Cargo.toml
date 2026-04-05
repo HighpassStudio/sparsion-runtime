@@ -1,0 +1,33 @@
+[workspace]
+members = [
+    "crates/runtime-types",
+    "crates/runtime-core",
+    "crates/runtime-sqlite",
+    "crates/runtime-ffi",
+    "examples/basic_agent",
+    "examples/project_memory_demo",
+    "examples/benchmark",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/highpass-studio/sparsion-runtime"
+description = "Temporal memory runtime for AI systems"
+
+[workspace.dependencies]
+sparsion-types = { path = "crates/runtime-types" }
+sparsion-core = { path = "crates/runtime-core" }
+sparsion-sqlite = { path = "crates/runtime-sqlite" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+pyo3 = { version = "0.22", features = ["extension-module"] }
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"

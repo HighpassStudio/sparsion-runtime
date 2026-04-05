@@ -1,0 +1,11 @@
+[package]
+name = "project-memory-demo"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+sparsion-types.workspace = true
+sparsion-core.workspace = true
+sparsion-sqlite.workspace = true
+chrono.workspace = true

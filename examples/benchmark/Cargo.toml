@@ -1,0 +1,13 @@
+[package]
+name = "benchmark"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+sparsion-types.workspace = true
+sparsion-core.workspace = true
+sparsion-sqlite.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+serde_json.workspace = true

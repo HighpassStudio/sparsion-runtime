@@ -1,0 +1,16 @@
+[package]
+name = "sparsion-sqlite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SQLite storage backend for Sparsion Runtime"
+
+[dependencies]
+sparsion-types.workspace = true
+sparsion-core.workspace = true
+rusqlite.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
