@@ -1,0 +1,13 @@
+[package]
+name = "sparsion-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core engine for Sparsion Runtime — traits, salience scoring, decay"
+
+[dependencies]
+sparsion-types.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
