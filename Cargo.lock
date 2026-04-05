@@ -37,7 +37,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "basic-agent"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "sparsion-core",
  "sparsion-sqlite",
@@ -46,7 +46,7 @@ dependencies = [
 
 [[package]]
 name = "benchmark"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "serde_json",
@@ -351,7 +351,7 @@ dependencies = [
 
 [[package]]
 name = "project-memory-demo"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "sparsion-core",
@@ -520,7 +520,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "sparsion-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "sparsion-types",
@@ -531,7 +531,7 @@ dependencies = [
 
 [[package]]
 name = "sparsion-ffi"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "pyo3",
  "sparsion-core",
@@ -542,7 +542,7 @@ dependencies = [
 
 [[package]]
 name = "sparsion-sqlite"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "rusqlite",
@@ -556,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "sparsion-types"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "serde",
