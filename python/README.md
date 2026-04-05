@@ -1,6 +1,6 @@
 # Sparsion
 
-Temporal memory runtime for AI systems. State for AI.
+Temporal memory engine for AI agents. Python SDK backed by a Rust core.
 
 ```python
 from sparsion import Runtime
@@ -16,3 +16,5 @@ for m in memories:
 result = rt.sweep()
 print(f"Swept {result['total_processed']} memories, forgot {result['forgotten']}")
 ```
+
+See the [main repo](https://github.com/HighpassStudio/sparsion-runtime) for full docs.
