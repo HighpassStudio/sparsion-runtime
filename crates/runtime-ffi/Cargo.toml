@@ -3,6 +3,7 @@ name = "sparsion-ffi"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
 description = "PyO3 bindings for Sparsion Runtime"
 
 [lib]
