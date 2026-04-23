@@ -57,13 +57,23 @@ def cmd_inspect(args):
     print(f"Total events: {count}")
     print()
 
+    # Force UTF-8 stdout on Windows
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     for tier_name in ["hot", "warm", "cold"]:
         memories = rt.query(tier=tier_name, limit=100)
         if memories:
             print(f"-- {tier_name.upper()} ({len(memories)}) --")
             for m in memories:
-                line = f"  {m['salience']:>6.2f}  [{m['source']}] {m['content']}"
-                sys.stdout.buffer.write(line.encode('utf-8', errors='replace') + b'\n')
+                try:
+                    print(f"  {m['salience']:>6.2f}  [{m['source']}] {m['content']}")
+                except UnicodeEncodeError:
+                    safe = m['content'].encode("ascii", errors="replace").decode("ascii")
+                    print(f"  {m['salience']:>6.2f}  [{m['source']}] {safe}")
             print()
 
 

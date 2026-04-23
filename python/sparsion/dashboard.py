@@ -7,12 +7,22 @@ Usage:
 
 from __future__ import annotations
 
+import io
 import os
+import sys
 from datetime import datetime, timezone
 
 from sparsion import Runtime
 
 DEFAULT_DB = os.path.expanduser("~/.sparsion/memory.db")
+
+
+# Force stdout to UTF-8 on Windows to handle em-dash, arrow, etc.
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 
 def format_age(timestamp_str: str) -> str:
@@ -91,7 +101,12 @@ def render_dashboard(db_path: str = None, top: int = 5, policy: str = None):
             content = m["content"]
             if len(content) > 60:
                 content = content[:57] + "..."
-            print(f"    {m['salience']:>6.2f}  {age:>6}  {content}{overridden}")
+            try:
+                print(f"    {m['salience']:>6.2f}  {age:>6}  {content}{overridden}")
+            except UnicodeEncodeError:
+                # Fallback for Windows cp1252
+                safe = content.encode("ascii", errors="replace").decode("ascii")
+                print(f"    {m['salience']:>6.2f}  {age:>6}  {safe}{overridden}")
         print()
 
     # Memory health
