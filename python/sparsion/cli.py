@@ -62,7 +62,8 @@ def cmd_inspect(args):
         if memories:
             print(f"-- {tier_name.upper()} ({len(memories)}) --")
             for m in memories:
-                print(f"  {m['salience']:>6.2f}  [{m['source']}] {m['content']}")
+                line = f"  {m['salience']:>6.2f}  [{m['source']}] {m['content']}"
+                sys.stdout.buffer.write(line.encode('utf-8', errors='replace') + b'\n')
             print()
 
 
