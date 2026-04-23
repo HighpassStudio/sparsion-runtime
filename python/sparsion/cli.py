@@ -17,7 +17,12 @@ def get_runtime(db_path=None, policy=None):
 
 def cmd_record(args):
     rt = get_runtime(args.db, args.policy)
-    event_id = rt.record(args.source, args.kind, args.content, importance=args.importance)
+    kwargs = {"importance": args.importance}
+    if getattr(args, "overrides", None):
+        kwargs["overrides"] = args.overrides
+    if getattr(args, "timestamp", None):
+        kwargs["timestamp"] = args.timestamp
+    event_id = rt.record(args.source, args.kind, args.content, **kwargs)
     print(event_id)
 
 
@@ -110,6 +115,8 @@ def main():
     p_rec.add_argument("kind", choices=["user_action", "observation", "decision", "error", "correction"])
     p_rec.add_argument("content", help="Event content")
     p_rec.add_argument("-i", "--importance", default="normal", choices=["low", "normal", "high", "critical"])
+    p_rec.add_argument("--overrides", help="Event ID this event supersedes")
+    p_rec.add_argument("--timestamp", help="RFC3339 timestamp to backdate event (e.g. 2026-04-14T15:30:00Z)")
 
     # query
     p_q = sub.add_parser("query", help="Query memories")

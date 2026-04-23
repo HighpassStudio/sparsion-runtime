@@ -33,17 +33,37 @@ impl Runtime {
     }
 
     /// Record an event into the runtime. Returns the event ID.
-    #[pyo3(signature = (source, kind, content, importance="normal", overrides=None))]
-    fn record(&self, source: &str, kind: &str, content: &str, importance: &str, overrides: Option<String>) -> PyResult<String> {
+    ///
+    /// `timestamp` is an optional RFC3339 / ISO 8601 string to backdate the event
+    /// (e.g. for migrating historical events). If omitted, uses the current time.
+    #[pyo3(signature = (source, kind, content, importance="normal", overrides=None, timestamp=None))]
+    fn record(
+        &self,
+        source: &str,
+        kind: &str,
+        content: &str,
+        importance: &str,
+        overrides: Option<String>,
+        timestamp: Option<String>,
+    ) -> PyResult<String> {
         let event_kind = parse_kind(kind)?;
         let imp = parse_importance(importance)?;
 
         let mut event = Event::new(source, event_kind, content).with_importance(imp);
+
         if let Some(ref target) = overrides {
             let target_id: uuid::Uuid = target.parse()
                 .map_err(|e: uuid::Error| PyRuntimeError::new_err(format!("invalid overrides UUID: {}", e)))?;
             event = event.with_overrides(target_id);
         }
+
+        if let Some(ref ts_str) = timestamp {
+            let ts = chrono::DateTime::parse_from_rfc3339(ts_str)
+                .map_err(|e| PyRuntimeError::new_err(format!("invalid timestamp (expected RFC3339): {}", e)))?
+                .with_timezone(&chrono::Utc);
+            event = event.with_timestamp(ts);
+        }
+
         let id = event.id.to_string();
 
         self.inner

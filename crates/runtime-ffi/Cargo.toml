@@ -15,3 +15,4 @@ sparsion-core.workspace = true
 sparsion-sqlite.workspace = true
 pyo3.workspace = true
 uuid.workspace = true
+chrono.workspace = true

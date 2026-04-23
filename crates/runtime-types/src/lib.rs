@@ -44,6 +44,12 @@ impl Event {
         self.overrides = Some(target_id);
         self
     }
+
+    /// Override the event timestamp (used for backfills/migrations).
+    pub fn with_timestamp(mut self, timestamp: DateTime<Utc>) -> Self {
+        self.timestamp = timestamp;
+        self
+    }
 }
 
 /// Classification of event types — affects base salience weight.
